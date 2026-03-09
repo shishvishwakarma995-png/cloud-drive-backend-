@@ -152,3 +152,49 @@ export const refreshToken = async (req: Request, res: Response) => {
     return res.status(401).json({ error: { code: 'INVALID_REFRESH_TOKEN', message: 'Invalid or expired refresh token' } });
   }
 };
+
+// FORGOT PASSWORD
+export const forgotPassword = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: { code: 'MISSING_EMAIL', message: 'Email required' } });
+
+    await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: 'http://localhost:3000/reset-password',
+    });
+
+    // Security ke liye hamesha success return karo
+    // (taaki koi test na kar sake ki email exist karti hai ya nahi)
+    return res.json({ message: 'If this email exists, a reset link has been sent.' });
+  } catch (err) {
+    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Something went wrong' } });
+  }
+};
+
+// RESET PASSWORD
+export const resetPassword = async (req: Request, res: Response) => {
+  try {
+    const { accessToken, newPassword } = req.body;
+
+    if (!accessToken || !newPassword) {
+      return res.status(400).json({ error: { code: 'MISSING_DATA', message: 'Token and password required' } });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: { code: 'WEAK_PASSWORD', message: 'Password must be at least 8 characters' } });
+    }
+
+    const { data: userData } = await supabase.auth.getUser(accessToken);
+    if (!userData.user) {
+      return res.status(400).json({ error: { code: 'INVALID_TOKEN', message: 'Invalid or expired token' } });
+    }
+
+    const { error } = await supabase.auth.admin.updateUserById(userData.user.id, { password: newPassword });
+
+    if (error) return res.status(400).json({ error: { code: 'RESET_FAILED', message: error.message } });
+
+    return res.json({ message: 'Password updated successfully' });
+  } catch (err) {
+    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Something went wrong' } });
+  }
+};
