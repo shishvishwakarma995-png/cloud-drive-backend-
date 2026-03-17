@@ -198,3 +198,92 @@ export const resetPassword = async (req: Request, res: Response) => {
     return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Something went wrong' } });
   }
 };
+
+// UPDATE PROFILE (name + avatar)
+export const updateProfile = async (req: Request, res: Response) => {
+  try {
+    const ownerId = req.userId!;
+    const { name, imageData } = req.body;
+
+    const updates: any = {};
+    if (name) updates.name = name;
+
+    // Agar photo upload ki hai
+    if (imageData) {
+      const buffer = Buffer.from(imageData, 'base64');
+      const storagePath = `avatars/${ownerId}/avatar.jpg`;
+
+      await supabase.storage.from('cloud-drive').remove([storagePath]);
+
+      const { error: uploadError } = await supabase.storage
+        .from('cloud-drive')
+        .upload(storagePath, buffer, { contentType: 'image/jpeg', upsert: true });
+
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage
+          .from('cloud-drive')
+          .getPublicUrl(storagePath);
+        updates.image_url = urlData.publicUrl;
+      }
+    }
+
+    const { data: user, error } = await supabase
+      .from('users')
+      .update(updates)
+      .eq('id', ownerId)
+      .select('id, email, name, image_url, created_at')
+      .single();
+
+    if (error || !user) {
+      return res.status(500).json({ error: { code: 'DB_ERROR', message: 'Failed to update profile' } });
+    }
+
+    return res.json({ user });
+  } catch (err: any) {
+    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: err.message } });
+  }
+};
+
+// CHANGE PASSWORD
+export const changePassword = async (req: Request, res: Response) => {
+  try {
+    const ownerId = req.userId!;
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: { code: 'MISSING_DATA', message: 'Both passwords required' } });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: { code: 'WEAK_PASSWORD', message: 'Password must be at least 8 characters' } });
+    }
+
+    // Current email dhundo
+    const { data: user } = await supabase
+      .from('users')
+      .select('email')
+      .eq('id', ownerId)
+      .single();
+
+    if (!user) return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'User not found' } });
+
+    // Current password verify karo
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: currentPassword,
+    });
+
+    if (authError) {
+      return res.status(400).json({ error: { code: 'WRONG_PASSWORD', message: 'Current password is incorrect' } });
+    }
+
+    // Naya password set karo
+    const { error } = await supabase.auth.admin.updateUserById(ownerId, { password: newPassword });
+
+    if (error) return res.status(500).json({ error: { code: 'UPDATE_FAILED', message: error.message } });
+
+    return res.json({ message: 'Password changed successfully' });
+  } catch (err: any) {
+    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: err.message } });
+  }
+};

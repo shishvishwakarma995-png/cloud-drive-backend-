@@ -228,3 +228,29 @@ export const deleteFolder = async (req: Request, res: Response) => {
     return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Something went wrong' } });
   }
 };
+
+// MOVE FOLDER
+export const moveFolder = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { parentId } = req.body;
+    const ownerId = req.userId!;
+
+    // Apne aap ke andar move nahi kar sakte!
+    if (parentId === id) {
+      return res.status(400).json({ error: { code: 'INVALID_MOVE', message: 'Cannot move folder into itself' } });
+    }
+
+    const { error } = await supabase
+      .from('folders')
+      .update({ parent_id: parentId || null, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('owner_id', ownerId);
+
+    if (error) return res.status(500).json({ error: { code: 'DB_ERROR', message: error.message } });
+
+    return res.json({ message: 'Folder moved successfully' });
+  } catch (err: any) {
+    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: err.message } });
+  }
+};
