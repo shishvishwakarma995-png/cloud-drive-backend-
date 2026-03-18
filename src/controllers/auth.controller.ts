@@ -17,8 +17,8 @@ const loginSchema = z.object({
 
 const cookieOptions = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'strict' as const,
+  secure: true,
+  sameSite: 'none' as const,
 };
 
 // REGISTER
@@ -64,6 +64,7 @@ export const register = async (req: Request, res: Response) => {
 
     return res.status(201).json({
       user: { id: user.id, email: user.email, name: user.name },
+      accessToken,
     });
   } catch (err: any) {
     if (err.name === 'ZodError') {
@@ -102,6 +103,7 @@ export const login = async (req: Request, res: Response) => {
 
     return res.json({
       user: { id: user.id, email: user.email, name: user.name },
+      accessToken,
     });
   } catch (err: any) {
     if (err.name === 'ZodError') {
@@ -160,11 +162,9 @@ export const forgotPassword = async (req: Request, res: Response) => {
     if (!email) return res.status(400).json({ error: { code: 'MISSING_EMAIL', message: 'Email required' } });
 
     await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'http://localhost:3000/reset-password',
+      redirectTo: `${process.env.CORS_ORIGIN}/reset-password`,
     });
 
-    // Security ke liye hamesha success return karo
-    // (taaki koi test na kar sake ki email exist karti hai ya nahi)
     return res.json({ message: 'If this email exists, a reset link has been sent.' });
   } catch (err) {
     return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Something went wrong' } });
@@ -199,7 +199,7 @@ export const resetPassword = async (req: Request, res: Response) => {
   }
 };
 
-// UPDATE PROFILE (name + avatar)
+// UPDATE PROFILE
 export const updateProfile = async (req: Request, res: Response) => {
   try {
     const ownerId = req.userId!;
@@ -208,7 +208,6 @@ export const updateProfile = async (req: Request, res: Response) => {
     const updates: any = {};
     if (name) updates.name = name;
 
-    // Agar photo upload ki hai
     if (imageData) {
       const buffer = Buffer.from(imageData, 'base64');
       const storagePath = `avatars/${ownerId}/avatar.jpg`;
@@ -258,7 +257,6 @@ export const changePassword = async (req: Request, res: Response) => {
       return res.status(400).json({ error: { code: 'WEAK_PASSWORD', message: 'Password must be at least 8 characters' } });
     }
 
-    // Current email dhundo
     const { data: user } = await supabase
       .from('users')
       .select('email')
@@ -267,7 +265,6 @@ export const changePassword = async (req: Request, res: Response) => {
 
     if (!user) return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'User not found' } });
 
-    // Current password verify karo
     const { error: authError } = await supabase.auth.signInWithPassword({
       email: user.email,
       password: currentPassword,
@@ -277,7 +274,6 @@ export const changePassword = async (req: Request, res: Response) => {
       return res.status(400).json({ error: { code: 'WRONG_PASSWORD', message: 'Current password is incorrect' } });
     }
 
-    // Naya password set karo
     const { error } = await supabase.auth.admin.updateUserById(ownerId, { password: newPassword });
 
     if (error) return res.status(500).json({ error: { code: 'UPDATE_FAILED', message: error.message } });

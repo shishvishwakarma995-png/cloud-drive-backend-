@@ -30,7 +30,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/folders', folderRoutes);
 app.use('/api/files', fileRoutes);
 
-// Public route — bina login ke access hoga
+// Public route — without authentication, for accessing shared links
 app.get('/api/public/share/:token', accessLinkShare);
 app.post('/api/public/share/:token', accessLinkShare);
 

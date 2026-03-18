@@ -1,24 +1,22 @@
 import { Request, Response, NextFunction } from 'express';
-import { verifyAccessToken } from '../lib/jwt';
-
-declare global {
-  namespace Express {
-    interface Request {
-      userId?: string;
-    }
-  }
-}
+import jwt from 'jsonwebtoken';
 
 export const protect = (req: Request, res: Response, next: NextFunction) => {
   try {
-    const token = req.cookies?.access_token;
-    if (!token) {
-      return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Not logged in' } });
+    let token = req.cookies?.access_token;
+
+    if (!token && req.headers.authorization?.startsWith('Bearer ')) {
+      token = req.headers.authorization.split(' ')[1];
     }
-    const decoded = verifyAccessToken(token);
+
+    if (!token) {
+      return res.status(401).json({ error: { code: 'NO_TOKEN', message: 'Not authorized' } });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
     req.userId = decoded.userId;
     next();
   } catch (err) {
-    return res.status(401).json({ error: { code: 'INVALID_TOKEN', message: 'Token expired or invalid' } });
+    return res.status(401).json({ error: { code: 'INVALID_TOKEN', message: 'Token invalid' } });
   }
 };

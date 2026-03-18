@@ -236,7 +236,7 @@ export const moveFolder = async (req: Request, res: Response) => {
     const { parentId } = req.body;
     const ownerId = req.userId!;
 
-    // Apne aap ke andar move nahi kar sakte!
+    //  Can't move inside yourself!
     if (parentId === id) {
       return res.status(400).json({ error: { code: 'INVALID_MOVE', message: 'Cannot move folder into itself' } });
     }
