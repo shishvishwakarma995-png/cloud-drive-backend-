@@ -455,3 +455,19 @@ export const getMyLinks = async (req: Request, res: Response) => {
     return res.status(500).json({ error: { code: 'SERVER_ERROR', message: err.message } });
   }
 };
+export const getSharesList = async (req: Request, res: Response) => {
+  try {
+    const { type, id } = req.params;
+    const ownerId = req.userId!;
+
+    const query = type === 'file'
+      ? supabase.from('file_shares').select('*').eq('file_id', id).eq('owner_id', ownerId)
+      : supabase.from('file_shares').select('*').eq('folder_id', id).eq('owner_id', ownerId);
+
+    const { data: shares } = await query.order('created_at', { ascending: false });
+
+    return res.json({ shares: shares || [] });
+  } catch (err: any) {
+    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: err.message } });
+  }
+};

@@ -6,7 +6,8 @@ import {
   toggleStar, getStarred,
   shareItem, getSharedWithMe, removeShare,
   moveFile, renameFile,
-  createLinkShare, accessLinkShare, deleteLinkShare, getMyLinks
+  createLinkShare, accessLinkShare, deleteLinkShare, getMyLinks,
+  getSharesList
 } from '../controllers/file.controller';
 import { protect } from '../middleware/auth';
 
@@ -29,6 +30,7 @@ router.delete('/permanent/:type/:id', permanentDelete);
 router.patch('/star/:type/:id', toggleStar);
 router.post('/share/:type/:id', shareItem);
 router.delete('/share/:shareId', removeShare);
+router.get('/shares/:type/:id', getSharesList);
 router.patch('/:id/move', moveFile);
 router.patch('/:id/rename', renameFile);
 router.post('/link/:type/:id', createLinkShare);
