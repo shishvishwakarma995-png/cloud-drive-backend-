@@ -2,7 +2,8 @@ import { Router } from 'express';
 import {
   register, login, logout, getMe,
   forgotPassword, resetPassword,
-  updateProfile, changePassword
+  updateProfile, changePassword,
+  oauthLogin
 } from '../controllers/auth.controller';
 import { protect } from '../middleware/auth';
 
@@ -16,5 +17,6 @@ router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
 router.patch('/profile', protect, updateProfile);
 router.patch('/change-password', protect, changePassword);
+router.post('/oauth-login', oauthLogin);
 
 export default router;
