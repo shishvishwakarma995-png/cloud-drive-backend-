@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
+import rateLimit from 'express-rate-limit';
 import authRoutes from './routes/auth.routes';
 import folderRoutes from './routes/folder.routes';
 import fileRoutes from './routes/file.routes';
@@ -14,23 +15,55 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 8080;
 
+// Rate limiters
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200,
+  message: { error: { code: 'RATE_LIMIT', message: 'Too many requests, please try again later.' } },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  message: { error: { code: 'RATE_LIMIT', message: 'Too many auth attempts, please try again later.' } },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const uploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 50,
+  message: { error: { code: 'RATE_LIMIT', message: 'Upload limit reached, please try again later.' } },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 app.use(helmet());
-app.use(cors({ 
-  origin: process.env.CORS_ORIGIN, 
-  credentials: true, 
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], 
-  allowedHeaders: ['Content-Type', 'Authorization'] 
+app.use(cors({
+  origin: process.env.CORS_ORIGIN,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(morgan('dev'));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cookieParser());
 
+// Apply rate limiting
+app.use('/api/', generalLimiter);
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/forgot-password', authLimiter);
+app.use('/api/files/upload', uploadLimiter);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/folders', folderRoutes);
 app.use('/api/files', fileRoutes);
 
-// Public route — without authentication, for accessing shared links
+// Public route
 app.get('/api/public/share/:token', accessLinkShare);
 app.post('/api/public/share/:token', accessLinkShare);
 

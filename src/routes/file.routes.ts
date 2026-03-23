@@ -7,7 +7,7 @@ import {
   shareItem, getSharedWithMe, removeShare,
   moveFile, renameFile,
   createLinkShare, accessLinkShare, deleteLinkShare, getMyLinks,
-  getSharesList
+  getSharesList, getActivityLog
 } from '../controllers/file.controller';
 import { protect } from '../middleware/auth';
 
@@ -25,6 +25,7 @@ router.get('/storage', getStorageUsage);
 router.get('/starred', getStarred);
 router.get('/shared-with-me', getSharedWithMe);
 router.get('/my-links', getMyLinks);
+router.get('/activity', getActivityLog);
 router.patch('/restore/:type/:id', restoreItem);
 router.delete('/permanent/:type/:id', permanentDelete);
 router.patch('/star/:type/:id', toggleStar);
