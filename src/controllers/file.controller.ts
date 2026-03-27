@@ -3,8 +3,14 @@ import { Request, Response } from 'express';
 import { supabase } from '../lib/supabase';
 import { sendShareNotification } from '../lib/email';
 
-// ============ ACTIVITY LOG HELPER ============
-const logActivity = async (actorId: string, action: string, resourceType: string, resourceId: string, resourceName?: string, context?: any) => {
+const logActivity = async (
+  actorId: string,
+  action: string,
+  resourceType: 'file' | 'folder',
+  resourceId: string,
+  resourceName?: string,
+  context?: any
+) => {
   try {
     await supabase.from('activities').insert({
       actor_id: actorId,
@@ -15,11 +21,9 @@ const logActivity = async (actorId: string, action: string, resourceType: string
       context,
     });
   } catch (err) {
-    // Log fail hone pe bhi app kaam kare
+    console.log('Activity log error');
   }
 };
-
-// ============ FILE FUNCTIONS ============
 
 export const uploadFile = async (req: Request, res: Response) => {
   try {
@@ -60,7 +64,6 @@ export const uploadFile = async (req: Request, res: Response) => {
       return res.status(500).json({ error: { code: 'DB_ERROR', message: dbError?.message || 'Failed to save file' } });
     }
 
-    // Activity log
     await logActivity(ownerId, 'upload', 'file', file.id, fileName);
 
     return res.status(201).json({ file: { ...file, url: urlData.publicUrl } });
@@ -117,11 +120,10 @@ export const deleteFile = async (req: Request, res: Response) => {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'File not found' } });
     }
 
-    await supabase.storage.from('cloud-drive').remove([file.storage_key]);
+    await supabase.storage.from('cloud-drive').remove([(file as any).storage_key]);
     await supabase.from('files').update({ is_deleted: true }).eq('id', id).eq('owner_id', ownerId);
 
-    // Activity log
-    await logActivity(ownerId, 'delete', 'file', id, file.name);
+    await logActivity(ownerId, 'delete', 'file', id, (file as any).name);
 
     return res.json({ message: 'File deleted' });
   } catch (err: any) {
@@ -181,7 +183,6 @@ export const restoreItem = async (req: Request, res: Response) => {
     const { data: item } = await supabase.from(table).select('name').eq('id', id).eq('owner_id', ownerId).single();
     await supabase.from(table).update({ is_deleted: false }).eq('id', id).eq('owner_id', ownerId);
 
-    // Activity log
     await logActivity(ownerId, 'restore', type as 'file' | 'folder', id, (item as any)?.name);
 
     return res.json({ message: 'Restored successfully' });
@@ -198,7 +199,7 @@ export const permanentDelete = async (req: Request, res: Response) => {
     if (type === 'file') {
       const { data: file } = await supabase.from('files').select('storage_key').eq('id', id).eq('owner_id', ownerId).single();
       if (file) {
-        await supabase.storage.from('cloud-drive').remove([file.storage_key]);
+        await supabase.storage.from('cloud-drive').remove([(file as any).storage_key]);
         await supabase.from('files').delete().eq('id', id).eq('owner_id', ownerId);
       }
     } else {
@@ -251,13 +252,12 @@ export const toggleStar = async (req: Request, res: Response) => {
     const table = type === 'file' ? 'files' : 'folders';
     const { data: item } = await supabase.from(table).select('is_starred, name').eq('id', id).eq('owner_id', ownerId).single();
     if (!item) return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Item not found' } });
-    const { error } = await supabase.from(table).update({ is_starred: !item.is_starred }).eq('id', id).eq('owner_id', ownerId);
+    const { error } = await supabase.from(table).update({ is_starred: !(item as any).is_starred }).eq('id', id).eq('owner_id', ownerId);
     if (error) return res.status(500).json({ error: { code: 'DB_ERROR', message: error.message } });
 
-    // Activity log
     await logActivity(ownerId, 'star', type as 'file' | 'folder', id, (item as any).name);
 
-    return res.json({ is_starred: !item.is_starred });
+    return res.json({ is_starred: !(item as any).is_starred });
   } catch (err) {
     return res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Something went wrong' } });
   }
@@ -304,19 +304,16 @@ export const shareItem = async (req: Request, res: Response) => {
     const { error } = await supabase.from('file_shares').insert(shareData);
     if (error) return res.status(500).json({ error: { code: 'DB_ERROR', message: error.message } });
 
-    // Get owner name for email
     const { data: ownerData } = await supabase.from('users').select('name').eq('id', ownerId).single();
 
-    // Send email notification
     await sendShareNotification({
       toEmail: email,
-      fromName: ownerData?.name || 'Someone',
+      fromName: (ownerData as any)?.name || 'Someone',
       fileName: (item as any).name,
       permission,
       shareUrl: `${process.env.CORS_ORIGIN}/dashboard/shared`,
     });
 
-    // Activity log
     await logActivity(ownerId, 'share', type as 'file' | 'folder', id, (item as any).name, { sharedWith: email, permission });
 
     return res.json({ message: 'Shared successfully' });
@@ -330,7 +327,7 @@ export const getSharedWithMe = async (req: Request, res: Response) => {
     const ownerId = req.userId!;
     const { data: userData } = await supabase.from('users').select('email').eq('id', ownerId).single();
     if (!userData) return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'User not found' } });
-    const { data: shares } = await supabase.from('file_shares').select(`id, permission, created_at, file_id, folder_id, files (id, name, mime_type, size_bytes, storage_key, created_at), folders (id, name, created_at)`).eq('shared_with_email', userData.email).order('created_at', { ascending: false });
+    const { data: shares } = await supabase.from('file_shares').select(`id, permission, created_at, file_id, folder_id, files (id, name, mime_type, size_bytes, storage_key, created_at), folders (id, name, created_at)`).eq('shared_with_email', (userData as any).email).order('created_at', { ascending: false });
     const files: any[] = [];
     const folders: any[] = [];
     (shares || []).forEach((share: any) => {
@@ -367,7 +364,6 @@ export const moveFile = async (req: Request, res: Response) => {
     const { error } = await supabase.from('files').update({ folder_id: folderId || null }).eq('id', id).eq('owner_id', ownerId);
     if (error) return res.status(500).json({ error: { code: 'DB_ERROR', message: error.message } });
 
-    // Activity log
     await logActivity(ownerId, 'move', 'file', id, (file as any)?.name);
 
     return res.json({ message: 'File moved successfully' });
@@ -387,7 +383,6 @@ export const renameFile = async (req: Request, res: Response) => {
     const { data: file, error } = await supabase.from('files').update({ name: name.trim() }).eq('id', id).eq('owner_id', ownerId).select().single();
     if (error || !file) return res.status(500).json({ error: { code: 'DB_ERROR', message: 'Failed to rename file' } });
 
-    // Activity log
     await logActivity(ownerId, 'rename', 'file', id, name.trim(), { oldName: (oldFile as any)?.name });
 
     return res.json({ file });
@@ -396,7 +391,6 @@ export const renameFile = async (req: Request, res: Response) => {
   }
 };
 
-// CREATE PUBLIC LINK
 export const createLinkShare = async (req: Request, res: Response) => {
   try {
     const ownerId = req.userId!;
@@ -453,7 +447,6 @@ export const createLinkShare = async (req: Request, res: Response) => {
   }
 };
 
-// ACCESS PUBLIC LINK
 export const accessLinkShare = async (req: Request, res: Response) => {
   try {
     const { token } = req.params;
@@ -524,7 +517,6 @@ export const getSharesList = async (req: Request, res: Response) => {
   }
 };
 
-// ACTIVITY LOG
 export const getActivityLog = async (req: Request, res: Response) => {
   try {
     const ownerId = req.userId!;
