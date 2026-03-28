@@ -615,15 +615,40 @@ export const getSharesList = async (req: Request, res: Response) => {
 
 export const getActivityLog = async (req: Request, res: Response) => {
   try {
-    const ownerId = req.userId!;
-    const { data: activities } = await supabase
+    console.log('📋 getActivityLog called, User:', req.userId);
+
+    if (!req.userId) {
+      return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'User not authenticated' } });
+    }
+
+    const ownerId = req.userId;
+
+    const { data: activities, error } = await supabase
       .from('activities')
       .select('*')
       .eq('actor_id', ownerId)
       .order('created_at', { ascending: false })
       .limit(50);
+
+    if (error) {
+      console.error('❌ Database error:', error.message);
+      return res.status(500).json({ 
+        error: { 
+          code: 'DB_ERROR', 
+          message: error.message
+        } 
+      });
+    }
+
+    console.log('✅ Returned', activities?.length || 0, 'activities');
     return res.json({ activities: activities || [] });
   } catch (err: any) {
-    return res.status(500).json({ error: { code: 'SERVER_ERROR', message: err.message } });
+    console.error('❌ Exception:', err.message);
+    return res.status(500).json({ 
+      error: { 
+        code: 'SERVER_ERROR', 
+        message: err.message 
+      } 
+    });
   }
 };
