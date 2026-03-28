@@ -3,9 +3,15 @@ import { Request, Response } from 'express';
 import { supabase } from '../lib/supabase';
 import { sendShareNotification } from '../lib/email';
 
-// Helper to safely extract single string from query/params
-const getString = (value: string | string[] | undefined): string | undefined => {
-  return Array.isArray(value) ? value[0] : value;
+// Helper to safely extract single string from query/params (handles string | string[] | ParsedQs | undefined)
+const getString = (value: any): string | undefined => {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'string') {
+    return value[0];
+  }
+  return undefined;
 };
 
 const logActivity = async (
