@@ -21,9 +21,9 @@ const logActivity = async (
   resourceId: string,
   resourceName?: string,
   context?: any
-) => {
+): Promise<void> => {
   try {
-    await supabase.from('activities').insert({
+    const { error } = await supabase.from('activities').insert({
       actor_id: actorId,
       action,
       resource_type: resourceType,
@@ -31,8 +31,21 @@ const logActivity = async (
       resource_name: resourceName,
       context,
     });
-  } catch (err) {
-    console.error('Activity log error:', err);
+
+    if (error) {
+      console.error('❌ Activity log failed:', {
+        message: error.message,
+        code: error.code,
+        action,
+        resourceType,
+        resourceId,
+      });
+      return;
+    }
+
+    console.log('✅ Activity logged:', { action, resourceType, resourceId });
+  } catch (err: any) {
+    console.error('❌ Activity log exception:', err.message);
   }
 };
 
