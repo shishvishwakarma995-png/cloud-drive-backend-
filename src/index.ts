@@ -40,6 +40,7 @@ const uploadLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+app.set('trust proxy', 1); 
 app.use(helmet());
 app.use(cors({
   origin: process.env.CORS_ORIGIN,
