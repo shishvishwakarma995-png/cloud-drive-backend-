@@ -23,29 +23,38 @@ const logActivity = async (
   context?: any
 ): Promise<void> => {
   try {
-    const { error } = await supabase.from('activities').insert({
+    console.log('🔍 logActivity called:', { actorId, action, resourceType, resourceId });
+
+    if (!actorId) {
+      console.error('❌ actorId is missing!');
+      return;
+    }
+
+    const { data, error } = await supabase.from('activities').insert({
       actor_id: actorId,
       action,
       resource_type: resourceType,
       resource_id: resourceId,
-      resource_name: resourceName,
-      context,
+      resource_name: resourceName || null,
+      context: context || null,
     });
 
     if (error) {
-      console.error('❌ Activity log failed:', {
+      console.error('❌ Supabase insert error:', {
         message: error.message,
         code: error.code,
-        action,
-        resourceType,
-        resourceId,
+        hint: error.hint,
+        details: error.details,
       });
       return;
     }
 
-    console.log('✅ Activity logged:', { action, resourceType, resourceId });
+    console.log('✅ Activity logged successfully:', { action, resourceId });
   } catch (err: any) {
-    console.error('❌ Activity log exception:', err.message);
+    console.error('❌ logActivity exception:', {
+      message: err.message,
+      stack: err.stack,
+    });
   }
 };
 
@@ -344,7 +353,6 @@ export const shareItem = async (req: Request, res: Response) => {
     
     const { data: sharedUser } = await supabase.from('users').select('id').eq('email', email).maybeSingle();
     
-    // 🔴 SECURITY FIX: Validate user exists before sharing
     if (!sharedUser) {
       return res.status(400).json({ error: { code: 'USER_NOT_FOUND', message: 'User with this email does not exist' } });
     }
