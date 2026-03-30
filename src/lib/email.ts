@@ -86,7 +86,7 @@ export const sendShareNotification = async ({
     console.log(`✅ Share email sent to ${toEmail}`);
   } catch (err: any) {
     console.log('❌ Email send failed:', err.message);
-    // Email fail ho to bhi share kaam kare
+    // Even if the email fails, the share will still work
   }
 };
 
